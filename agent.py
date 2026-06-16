@@ -1,3 +1,6 @@
+import re
+
+from tools import search_listings, suggest_outfit, create_fit_card
 """
 agent.py
 
@@ -18,7 +21,6 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
-from tools import search_listings, suggest_outfit, create_fit_card
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -47,7 +49,6 @@ def _new_session(query: str, wardrobe: dict) -> dict:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict) -> dict:
     """
     Main agent entry point. Runs the FitFindr planning loop for a single
     user interaction and returns the completed session dict.
@@ -93,8 +94,78 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     of planning.md — your implementation should match what you described there.
     """
     # TODO: implement the planning loop
+def run_agent(query: str, wardrobe: dict) -> dict:
+    """
+    Main agent entry point. Runs the FitFindr planning loop for a single
+    user interaction and returns the completed session dict.
+    """
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 1: basic parsing from the user query
+    cleaned_query = query.strip()
+
+    max_price = None
+    price_match = re.search(r"(?:under|below|less than|max|maximum)?\s*\$?(\d+(?:\.\d+)?)", cleaned_query.lower())
+    if price_match and ("$" in cleaned_query or "under" in cleaned_query.lower()):
+        max_price = float(price_match.group(1))
+
+    size = None
+    size_match = re.search(r"size\s+([a-z0-9./-]+)", cleaned_query.lower())
+    if size_match:
+        size = size_match.group(1).upper()
+
+    description = cleaned_query.lower()
+
+    # Remove price language from description
+    description = re.sub(r"under\s*\$?\d+(?:\.\d+)?", "", description)
+    description = re.sub(r"below\s*\$?\d+(?:\.\d+)?", "", description)
+    description = re.sub(r"less than\s*\$?\d+(?:\.\d+)?", "", description)
+    description = re.sub(r"\$?\d+(?:\.\d+)?", "", description)
+
+    # Remove size language from description
+    description = re.sub(r"size\s+[a-z0-9./-]+", "", description)
+
+    # Remove filler words
+    description = description.replace("looking for", "")
+    description = description.replace("i'm", "")
+    description = description.replace("im", "")
+    description = description.replace("a ", " ")
+    description = description.strip()
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    # Step 2: search listings
+    results = search_listings(description, size=size, max_price=max_price)
+    session["search_results"] = results
+
+    # Step 3: branch if no results
+    if not results:
+        session["error"] = (
+            "I couldn't find any listings that matched those filters. "
+            "Try raising your budget, removing the size filter, or using a broader search term."
+        )
+        return session
+
+    # Step 4: select top item
+    selected_item = results[0]
+    session["selected_item"] = selected_item
+
+    # Step 5: suggest outfit
+    outfit = suggest_outfit(selected_item, wardrobe)
+    session["outfit_suggestion"] = outfit
+
+    if not outfit:
+        session["error"] = "I found an item, but I couldn't create an outfit suggestion."
+        return session
+
+    # Step 6: create fit card
+    fit_card = create_fit_card(outfit, selected_item)
+    session["fit_card"] = fit_card
+
     return session
 
 
