@@ -134,16 +134,24 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 Write out what a full user interaction looks like from start to finish — tool call by tool call. Use a specific example query.
 
+FitFindr helps a user find secondhand clothing items and decide how to style them with pieces they already own. The search tool is triggered first when the user describes what they want, the outfit suggestion tool is triggered after a valid listing is found, and the fit card tool is triggered after a complete outfit has been created. If any tool fails, FitFindr should explain the problem and either stop safely, try a fallback search, or ask the user for more information instead of continuing with missing data.
+
 **Example user query:** "I'm looking for a vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers. What's out there and how would I style it?"
 
 **Step 1:**
 <!-- What does the agent do first? Which tool is called? With what input? -->
+The agent identifies the request: a vintage graphic tee under $30. Since no size is provided, it searches without a size filter.
 
 **Step 2:**
 <!-- What happens next? What was returned from step 1? What tool is called now? -->
+The agent calls search_listings("vintage graphic tee", size=None, max_price=30.0). If it finds matches, it selects the best one. 
+If not, it lets the user know and suggests adjusting the filters.
 
 **Step 3:**
 <!-- Continue until the full interaction is complete -->
+The agent calls suggest_outfit(selected_item, wardrobe) to create an outfit using the user’s wardrobe.
 
 **Final output to user:**
 <!-- What does the user actually see at the end? -->
+The agent calls create_fit_card(outfit, selected_item) to generate a short, shareable caption.
+The user receives a recommended item, an outfit suggestion, and a fit card caption.
